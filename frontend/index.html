@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>API Monitor — Test & Track</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0a0c0f; --bg2:#111418; --bg3:#191d24;
+  --border:#252b35; --border2:#2e3747;
+  --accent:#00d4aa; --accent2:#0097ff;
+  --warn:#ffb347; --error:#ff4d6d; --success:#3dfaad;
+  --text:#e8edf5; --text2:#8c97a8; --text3:#5a6475;
+  --mono:'JetBrains Mono',monospace; --sans:'Syne',sans-serif;
+  --radius:8px; --glow:0 0 20px rgba(0,212,170,0.12);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+.shell{display:flex;height:100vh}
+.sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.main{flex:1;overflow:auto;display:flex;flex-direction:column}
+.logo{padding:20px 18px 16px;border-bottom:1px solid var(--border)}
+.logo-mark{font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.logo-sub{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px}
+.nav{flex:1;padding:10px 0;overflow-y:auto}
+.nav-section{padding:10px 18px 4px;font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.14em;color:var(--text3);text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 18px;font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;border-left:2px solid transparent;transition:all .15s;user-select:none}
+.nav-item:hover{color:var(--text);background:var(--bg3)}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(0,212,170,.05)}
+.sidebar-footer{padding:14px 18px;border-top:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--text3)}
+.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--success);margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.topbar{padding:16px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg2);flex-shrink:0}
+.page-title{font-size:17px;font-weight:800}
+.page-desc{font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:2px}
+.content{flex:1;padding:24px 28px;overflow:auto}
+/* Pages */
+.page{display:none}.page.active{display:block}
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:20px}
+.card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:13px;font-weight:700}
+.card-body{padding:20px}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:var(--radius);font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .15s;letter-spacing:.03em}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{background:#00f0c2;box-shadow:var(--glow)}
+.btn-ghost{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+.btn-danger{background:rgba(255,77,109,.12);color:var(--error);border:1px solid rgba(255,77,109,.25)}
+.btn-danger:hover{background:rgba(255,77,109,.2)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+/* Forms */
+input,select,textarea{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:12px;padding:9px 12px;outline:none;transition:border-color .15s;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,212,170,.1)}
+textarea{resize:vertical;min-height:80px}
+label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:6px}
+.field{margin-bottom:14px}
+.field-row{display:flex;gap:12px}
+.field-row .field{flex:1}
+/* Badges */
+.method{display:inline-block;padding:2px 8px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.06em}
+.method-GET{background:rgba(61,250,173,.12);color:var(--success)}
+.method-POST{background:rgba(0,151,255,.12);color:var(--accent2)}
+.method-PUT{background:rgba(255,179,71,.12);color:var(--warn)}
+.method-PATCH{background:rgba(162,89,255,.12);color:#a259ff}
+.method-DELETE{background:rgba(255,77,109,.12);color:var(--error)}
+.method-HEAD{background:rgba(255,179,71,.12);color:var(--warn)}
+.status-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:700}
+.status-2xx{background:rgba(61,250,173,.1);color:var(--success)}
+.status-3xx{background:rgba(0,151,255,.1);color:var(--accent2)}
+.status-4xx{background:rgba(255,179,71,.1);color:var(--warn)}
+.status-5xx{background:rgba(255,77,109,.1);color:var(--error)}
+.status-err{background:rgba(255,77,109,.1);color:var(--error)}
+.slow-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;background:rgba(255,179,71,.1);color:var(--warn);font-family:var(--mono);font-size:10px;font-weight:700}
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card.green::before{background:linear-gradient(90deg,var(--accent),transparent)}
+.stat-card.blue::before{background:linear-gradient(90deg,var(--accent2),transparent)}
+.stat-card.warn::before{background:linear-gradient(90deg,var(--warn),transparent)}
+.stat-card.red::before{background:linear-gradient(90deg,var(--error),transparent)}
+.stat-label{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.stat-value{font-size:28px;font-weight:800;line-height:1}
+.stat-card.green .stat-value{color:var(--accent)}
+.stat-card.blue .stat-value{color:var(--accent2)}
+.stat-card.warn .stat-value{color:var(--warn)}
+.stat-card.red .stat-value{color:var(--error)}
+.stat-sub{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px}
+/* Table */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--text3);text-transform:uppercase;padding:10px 14px;border-bottom:1px solid var(--border);text-align:left}
+td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg3)}
+/* Response panel */
+.response-meta{display:flex;gap:20px;padding:12px 16px;background:var(--bg3);border-bottom:1px solid var(--border);border-radius:10px 10px 0 0;font-family:var(--mono);font-size:11px;flex-wrap:wrap}
+.meta-item{display:flex;flex-direction:column;gap:2px}
+.meta-label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em}
+.meta-value{font-weight:700}
+.response-panel{background:var(--bg);border:1px solid var(--border);font-family:var(--mono);font-size:11px;padding:16px;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow:auto;line-height:1.7;color:#a8d8b8;border-radius:0 0 10px 10px}
+/* Tabs */
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg3)}
+.tab{padding:10px 18px;font-size:12px;font-weight:700;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+/* Two col */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:900px){.two-col{grid-template-columns:1fr}}
+/* Endpoint list */
+.ep-item{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
+.ep-item:last-child{border-bottom:none}
+.ep-item:hover{background:var(--bg3)}
+.ep-info{flex:1;min-width:0}
+.ep-name{font-size:12px;font-weight:700;margin-bottom:3px}
+.ep-url{font-family:var(--mono);font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ep-actions{display:flex;gap:6px;opacity:0;transition:opacity .15s}
+.ep-item:hover .ep-actions{opacity:1}
+/* Alert */
+.alert-item{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.alert-item:last-child{border-bottom:none}
+.alert-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.alert-slow .alert-icon{background:rgba(255,179,71,.12)}
+.alert-error .alert-icon,.alert-down .alert-icon{background:rgba(255,77,109,.12)}
+.alert-body{flex:1;min-width:0}
+.alert-title{font-size:12px;font-weight:700}
+.alert-msg{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px}
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(3px)}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:800}
+.modal-body{padding:20px 24px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.close-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px;border-radius:4px}
+.close-btn:hover{color:var(--text);background:var(--bg3)}
+/* Spinner */
+.spinner{width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Toast */
+.toast-wrap{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:10px;z-index:9999;pointer-events:none}
+.toast{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 18px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:10px;animation:slideIn .25s ease;pointer-events:all;max-width:320px}
+.toast.success{border-color:rgba(61,250,173,.3)}
+.toast.error{border-color:rgba(255,77,109,.3);color:var(--error)}
+@keyframes slideIn{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+.empty{text-align:center;padding:48px 24px;color:var(--text3);font-family:var(--mono);font-size:12px}
+.empty-icon{font-size:32px;margin-bottom:12px;opacity:.4}
+.chart-box{position:relative;height:200px}
+.truncate{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">API Monitor</div>
+      <div class="logo-sub">v1.0 · Test & Track</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Navigation</div>
+      <div class="nav-item active" data-page="tester"><span>⚡</span> API Tester</div>
+      <div class="nav-item" data-page="history"><span>📋</span> Test History</div>
+      <div class="nav-item" data-page="endpoints"><span>🔗</span> Endpoints</div>
+      <div class="nav-item" data-page="dashboard"><span>📊</span> Dashboard</div>
+      <div class="nav-item" data-page="compare"><span>⚖️</span> Compare</div>
+    </nav>
+    <div class="sidebar-footer"><span class="status-dot"></span>Backend: localhost:4001</div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="topbar-title">API Tester</div>
+        <div class="page-desc" id="topbar-desc">Send requests and inspect responses</div>
+      </div>
+      <div id="topbar-actions"></div>
+    </div>
+
+    <div class="content">
+
+      <!-- ── TESTER PAGE ── -->
+      <div class="page active" id="page-tester">
+        <div class="two-col">
+          <div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Request</span></div>
+              <div class="card-body">
+                <div class="field">
+                  <label>Name (optional)</label>
+                  <input id="tf-name" placeholder="My API name"/>
+                </div>
+                <div class="field-row">
+                  <div class="field" style="flex:0 0 120px">
+                    <label>Method</label>
+                    <select id="tf-method">
+                      <option>GET</option><option>POST</option><option>PUT</option>
+                      <option>PATCH</option><option>DELETE</option><option>HEAD</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>URL</label>
+                    <input id="tf-url" placeholder="https://api.example.com/endpoint" value="https://jsonplaceholder.typicode.com/posts/1"/>
+                  </div>
+                </div>
+                <div class="field">
+                  <label>Headers (JSON)</label>
+                  <textarea id="tf-headers" rows="2">{}</textarea>
+                </div>
+                <div class="field">
+                  <label>Body (POST/PUT/PATCH)</label>
+                  <textarea id="tf-body" rows="3" placeholder='{"key":"value"}'></textarea>
+                </div>
+                <div class="field-row">
+                  <div class="field" style="flex:0 0 180px">
+                    <label>Slow threshold (ms)</label>
+                    <input id="tf-threshold" type="number" value="1000" min="100" step="100"/>
+                  </div>
+                  <div class="field" style="display:flex;align-items:flex-end;gap:8px">
+                    <button class="btn btn-primary" id="btn-run" style="flex:1">▶ Send Request</button>
+                    <button class="btn btn-ghost" id="btn-save-ep" title="Save as endpoint">💾</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Saved endpoints quick load -->
+            <div class="card" id="quick-load-card">
+              <div class="card-header"><span class="card-title">Load Saved Endpoint</span></div>
+              <div id="quick-load-list" style="max-height:200px;overflow-y:auto">
+                <div class="empty"><div class="empty-icon">🔗</div>No saved endpoints yet</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Response -->
+          <div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Response</span></div>
+              <div id="response-area">
+                <div class="empty"><div class="empty-icon">📡</div>Hit Send to see the response</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── HISTORY PAGE ── -->
+      <div class="page" id="page-history">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">
+          <select id="hist-ep-filter" style="width:220px">
+            <option value="">All endpoints</option>
+          </select>
+          <span id="hist-count" style="font-family:var(--mono);font-size:11px;color:var(--text3)"></span>
+          <button class="btn btn-danger" id="btn-clear-hist" style="margin-left:auto">🗑 Clear</button>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Method</th><th>URL</th><th>Status</th><th>Time</th><th>Flags</th><th>When</th>
+              </tr></thead>
+              <tbody id="history-tbody">
+                <tr><td colspan="6"><div class="empty"><div class="empty-icon">📋</div>No history yet</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ENDPOINTS PAGE ── -->
+      <div class="page" id="page-endpoints">
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title" id="ep-count-label">Endpoints</span>
+            </div>
+            <div id="ep-list" style="max-height:70vh;overflow-y:auto">
+              <div class="empty"><div class="empty-icon">🔗</div>No endpoints saved</div>
+            </div>
+          </div>
+          <div id="ep-stats-panel">
+            <div class="card"><div class="empty"><div class="empty-icon">👈</div>Select an endpoint</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── DASHBOARD PAGE ── -->
+      <div class="page" id="page-dashboard">
+        <div class="stats-grid" id="dash-stats">
+          <div class="stat-card blue"><div class="stat-label">Loading…</div><div class="stat-value">—</div></div>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Recent Alerts</span>
+              <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" id="btn-ack-all">✓ Ack All</button>
+            </div>
+            <div id="alerts-list" style="max-height:340px;overflow-y:auto">
+              <div class="empty"><div class="empty-icon">✅</div>No alerts</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Slowest Endpoints (24h)</span></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Endpoint</th><th>Avg</th><th>Runs</th><th>Slow%</th></tr></thead>
+                <tbody id="slowest-tbody">
+                  <tr><td colspan="4"><div class="empty" style="padding:24px">No data</div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Response Time Trend (last 50 tests)</span></div>
+          <div class="card-body">
+            <div class="chart-box" style="height:220px"><canvas id="dash-chart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── COMPARE PAGE ── -->
+      <div class="page" id="page-compare">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Select Endpoints to Compare</span></div>
+          <div class="card-body">
+            <div id="compare-checkboxes" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+              <span style="font-family:var(--mono);font-size:11px;color:var(--text3)">No endpoints saved yet</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center">
+              <select id="compare-period" style="width:120px">
+                <option value="1h">1h</option>
+                <option value="24h" selected>24h</option>
+                <option value="7d">7d</option>
+                <option value="30d">30d</option>
+              </select>
+              <button class="btn btn-primary" id="btn-compare">Compare</button>
+            </div>
+          </div>
+        </div>
+        <div id="compare-results">
+          <div class="card"><div class="empty"><div class="empty-icon">⚖️</div>Select endpoints above and click Compare</div></div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- Modal -->
+<div class="modal-overlay" id="ep-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">New Endpoint</span>
+      <button class="close-btn" id="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="modal-ep-id"/>
+      <div class="field"><label>Name</label><input id="modal-name" placeholder="My API"/></div>
+      <div class="field-row">
+        <div class="field" style="flex:0 0 120px">
+          <label>Method</label>
+          <select id="modal-method">
+            <option>GET</option><option>POST</option><option>PUT</option>
+            <option>PATCH</option><option>DELETE</option><option>HEAD</option>
+          </select>
+        </div>
+        <div class="field"><label>URL</label><input id="modal-url" placeholder="https://api.example.com/path"/></div>
+      </div>
+      <div class="field"><label>Headers (JSON)</label><textarea id="modal-headers" rows="3">{}</textarea></div>
+      <div class="field"><label>Body</label><textarea id="modal-body" rows="3"></textarea></div>
+      <div class="field" style="max-width:180px"><label>Slow threshold (ms)</label><input id="modal-threshold" type="number" value="1000" min="100" step="100"/></div>
+      <div class="field"><label>Tags</label><input id="modal-tags" placeholder="production, auth"/></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-save">Save Endpoint</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+const API_BASE = 'http://localhost:4001/api';
+
+// ── Data cache ──────────────────────────────────────────
+let endpoints = [];
+let history   = [];
+let dashChart = null;
+let compareChart = null;
+let selectedEpId = null;
+
+// ── Helpers ─────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmtMs = ms => ms == null ? '—' : ms < 1000 ? ms+'ms' : (ms/1000).toFixed(2)+'s';
+const fmtTime = ts => new Date(ts).toLocaleString();
+const fmtTimeShort = ts => new Date(ts).toLocaleTimeString();
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function statusClass(code){ if(!code) return 'status-err'; if(code<300) return 'status-2xx'; if(code<400) return 'status-3xx'; if(code<500) return 'status-4xx'; return 'status-5xx'; }
+
+function toast(msg, type='success'){
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = (type==='error'?'⛔':'✅') + ' ' + esc(msg);
+  $('toast-wrap').appendChild(el);
+  setTimeout(()=>el.remove(), 3500);
+}
+
+async function api(method, path, body){
+  try {
+    const opts = { method, headers:{'Content-Type':'application/json'} };
+    if(body) opts.body = JSON.stringify(body);
+    const r = await fetch(API_BASE+path, opts);
+    if(!r.ok){ const e=await r.json().catch(()=>({error:`HTTP ${r.status}`})); throw new Error(e.error||`HTTP ${r.status}`); }
+    return r.json();
+  } catch(e){ toast(e.message,'error'); throw e; }
+}
+
+// ── Navigation ──────────────────────────────────────────
+const pageMeta = {
+  tester:    { title:'API Tester',       desc:'Send requests and inspect responses' },
+  history:   { title:'Test History',     desc:'All past test runs' },
+  endpoints: { title:'Saved Endpoints',  desc:'Manage your saved API endpoints' },
+  dashboard: { title:'Dashboard',        desc:'Performance overview & alerts' },
+  compare:   { title:'Compare',          desc:'Side-by-side performance analysis' },
+};
+
+document.querySelectorAll('[data-page]').forEach(el => {
+  el.addEventListener('click', () => switchPage(el.dataset.page));
+});
+
+function switchPage(page){
+  document.querySelectorAll('[data-page]').forEach(el => el.classList.toggle('active', el.dataset.page===page));
+  document.querySelectorAll('.page').forEach(el => el.classList.toggle('active', el.id==='page-'+page));
+  $('topbar-title').textContent = pageMeta[page].title;
+  $('topbar-desc').textContent  = pageMeta[page].desc;
+
+  // Topbar action buttons
+  $('topbar-actions').innerHTML = '';
+  if(page==='endpoints'){
+    const b = document.createElement('button');
+    b.className='btn btn-primary'; b.textContent='+ New Endpoint';
+    b.onclick = () => openModal();
+    $('topbar-actions').appendChild(b);
+  }
+  if(page==='dashboard'){
+    const b = document.createElement('button');
+    b.className='btn btn-ghost'; b.textContent='↺ Refresh';
+    b.onclick = loadDashboard;
+    $('topbar-actions').appendChild(b);
+  }
+
+  if(page==='history')   loadHistory();
+  if(page==='dashboard') loadDashboard();
+  if(page==='compare')   renderCompareCheckboxes();
+}
+
+// ── API Tester ──────────────────────────────────────────
+$('btn-run').addEventListener('click', runTest);
+$('btn-save-ep').addEventListener('click', () => {
+  openModal({
+    name: $('tf-name').value,
+    url: $('tf-url').value,
+    method: $('tf-method').value,
+    headers: $('tf-headers').value,
+    body: $('tf-body').value,
+    threshold_ms: $('tf-threshold').value,
+  });
+});
+
+async function runTest(){
+  const url = $('tf-url').value.trim();
+  if(!url){ toast('URL is required','error'); return; }
+  const btn = $('btn-run');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Sending…';
+  $('response-area').innerHTML = '<div class="empty"><div class="spinner" style="margin:0 auto 8px"></div>Waiting for response…</div>';
+
+  try {
+    let headers = {};
+    try { headers = JSON.parse($('tf-headers').value||'{}'); } catch{ toast('Invalid JSON in headers','error'); return; }
+    const result = await api('POST', '/tests/run', {
+      url, method: $('tf-method').value,
+      headers, body: $('tf-body').value,
+      threshold_ms: +$('tf-threshold').value || 1000,
+    });
+    renderResponse(result);
+    loadQuickList();
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '▶ Send Request';
+  }
+}
+
+function renderResponse(r){
+  const scClass = statusClass(r.status_code);
+  $('response-area').innerHTML = `
+    <div class="response-meta">
+      <div class="meta-item"><span class="meta-label">Status</span><span class="meta-value ${scClass}">${r.status_code||'—'}</span></div>
+      <div class="meta-item"><span class="meta-label">Time</span><span class="meta-value" style="color:${r.is_slow?'var(--warn)':'var(--text)'}">${fmtMs(r.response_time)}</span></div>
+      <div class="meta-item"><span class="meta-label">Size</span><span class="meta-value">${r.response_body?(r.response_body.length/1024).toFixed(1)+'KB':'—'}</span></div>
+      ${r.is_slow?'<div class="meta-item"><span class="slow-badge">⚠ SLOW</span></div>':''}
+      ${r.error?`<div class="meta-item"><span class="meta-value" style="color:var(--error)">⛔ ${esc(r.error)}</span></div>`:''}
+    </div>
+    <div class="tabs" id="resp-tabs">
+      <div class="tab active" data-tab="body">Body</div>
+      <div class="tab" data-tab="headers">Headers</div>
+    </div>
+    <div id="resp-body-wrap"><div class="response-panel">${esc(r.response_body||'(empty)')}</div></div>
+    <div id="resp-headers-wrap" style="display:none"><div class="response-panel">${esc(JSON.stringify(r.response_headers,null,2))}</div></div>
+  `;
+  document.querySelectorAll('#resp-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('#resp-tabs .tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      $('resp-body-wrap').style.display    = tab.dataset.tab==='body'?'':'none';
+      $('resp-headers-wrap').style.display = tab.dataset.tab==='headers'?'':'none';
+    });
+  });
+}
+
+// ── Quick load list ─────────────────────────────────────
+async function loadQuickList(){
+  try {
+    endpoints = await api('GET','/endpoints');
+    const list = $('quick-load-list');
+    if(!endpoints.length){ list.innerHTML='<div class="empty"><div class="empty-icon">🔗</div>No saved endpoints yet</div>'; return; }
+    list.innerHTML = endpoints.map(ep=>`
+      <div class="ep-item" data-ep-load="${ep.id}">
+        <span class="method method-${ep.method}">${ep.method}</span>
+        <div class="ep-info">
+          <div class="ep-name">${esc(ep.name)}</div>
+          <div class="ep-url">${esc(ep.url)}</div>
+        </div>
+      </div>
+    `).join('');
+    list.querySelectorAll('[data-ep-load]').forEach(el=>{
+      el.addEventListener('click',()=>{
+        const ep = endpoints.find(e=>e.id===el.dataset.epLoad);
+        if(!ep) return;
+        $('tf-name').value      = ep.name;
+        $('tf-url').value       = ep.url;
+        $('tf-method').value    = ep.method;
+        $('tf-headers').value   = JSON.stringify(ep.headers||{},null,2);
+        $('tf-body').value      = ep.body||'';
+        $('tf-threshold').value = ep.threshold_ms||1000;
+      });
+    });
+  } catch{}
+}
+
+// ── History ─────────────────────────────────────────────
+async function loadHistory(){
+  try {
+    const epId = $('hist-ep-filter').value;
+    const q = epId ? `?endpoint_id=${epId}&limit=100` : '?limit=100';
+    history = await api('GET','/tests/history'+q);
+    renderHistoryTable(history);
+    // Populate filter dropdown
+    const sel = $('hist-ep-filter');
+    const cur = sel.value;
+    endpoints = await api('GET','/endpoints');
+    sel.innerHTML = '<option value="">All endpoints</option>' +
+      endpoints.map(e=>`<option value="${e.id}" ${cur===e.id?'selected':''}>${esc(e.name)}</option>`).join('');
+    $('hist-count').textContent = history.length + ' results';
+  } catch{}
+}
+
+function renderHistoryTable(rows){
+  const tbody = $('history-tbody');
+  if(!rows.length){ tbody.innerHTML='<tr><td colspan="6"><div class="empty"><div class="empty-icon">📋</div>No test results yet</div></td></tr>'; return; }
+  tbody.innerHTML = rows.map(r=>`
+    <tr>
+      <td><span class="method method-${r.method}">${r.method}</span></td>
+      <td><span class="truncate" style="font-family:var(--mono);font-size:11px;color:var(--text2)">${esc(r.url)}</span></td>
+      <td><span class="status-badge ${statusClass(r.status_code)}">${r.status_code||'ERR'}</span></td>
+      <td style="font-family:var(--mono);font-size:11px;color:${r.is_slow?'var(--warn)':'var(--text2)'}">${fmtMs(r.response_time)}</td>
+      <td>${r.is_slow?'<span class="slow-badge">⚠ slow</span>':''}${r.error?'<span class="status-badge status-err">error</span>':''}</td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--text3)">${fmtTime(r.created_at)}</td>
+    </tr>
+  `).join('');
+}
+
+$('hist-ep-filter').addEventListener('change', loadHistory);
+$('btn-clear-hist').addEventListener('click', async ()=>{
+  const epId = $('hist-ep-filter').value;
+  if(!epId){ toast('Select an endpoint to clear its history','error'); return; }
+  if(!confirm('Clear all history for this endpoint?')) return;
+  await api('DELETE','/tests/history/'+epId);
+  toast('History cleared');
+  loadHistory();
+});
+
+// ── Endpoints ───────────────────────────────────────────
+async function loadEndpoints(){
+  try {
+    endpoints = await api('GET','/endpoints');
+    renderEndpointList();
+  } catch{}
+}
+
+function renderEndpointList(){
+  $('ep-count-label').textContent = endpoints.length + ' Endpoints';
+  const list = $('ep-list');
+  if(!endpoints.length){ list.innerHTML='<div class="empty"><div class="empty-icon">🔗</div>No endpoints saved yet</div>'; return; }
+  list.innerHTML = endpoints.map(ep=>`
+    <div class="ep-item ${selectedEpId===ep.id?'selected':''}" data-ep-select="${ep.id}" style="${selectedEpId===ep.id?'background:rgba(0,212,170,.04);border-left:2px solid var(--accent)':''}">
+      <span class="method method-${ep.method}">${ep.method}</span>
+      <div class="ep-info">
+        <div class="ep-name">${esc(ep.name)}</div>
+        <div class="ep-url">${esc(ep.url)}</div>
+      </div>
+      <div class="ep-actions">
+        <button class="btn btn-ghost" style="padding:4px 8px;font-size:11px" data-ep-edit="${ep.id}">✎</button>
+        <button class="btn btn-danger" style="padding:4px 8px;font-size:11px" data-ep-del="${ep.id}">✕</button>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('[data-ep-select]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.closest('[data-ep-edit]')||e.target.closest('[data-ep-del]')) return;
+      selectedEpId = el.dataset.epSelect;
+      renderEndpointList();
+      renderEpStats();
+    });
+  });
+  list.querySelectorAll('[data-ep-edit]').forEach(el=>{
+    el.addEventListener('click', e=>{ e.stopPropagation(); const ep=endpoints.find(e=>e.id===el.dataset.epEdit); if(ep) openModal(ep); });
+  });
+  list.querySelectorAll('[data-ep-del]').forEach(el=>{
+    el.addEventListener('click', async e=>{ e.stopPropagation(); await deleteEndpoint(el.dataset.epDel); });
+  });
+}
+
+async function renderEpStats(){
+  const ep = endpoints.find(e=>e.id===selectedEpId);
+  if(!ep){ $('ep-stats-panel').innerHTML='<div class="card"><div class="empty"><div class="empty-icon">👈</div>Select an endpoint</div></div>'; return; }
+  const hist = await api('GET',`/tests/history?endpoint_id=${ep.id}&limit=30`).catch(()=>[]);
+  const times = hist.filter(r=>r.response_time!=null).map(r=>r.response_time);
+  const avg = times.length ? Math.round(times.reduce((s,v)=>s+v,0)/times.length) : null;
+
+  $('ep-stats-panel').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">${esc(ep.name)}</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" style="font-size:11px;padding:6px 12px" id="ep-stat-run">▶ Run</button>
+          <button class="btn btn-ghost" style="font-size:11px;padding:6px 12px" id="ep-stat-edit">✎ Edit</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="stat-card blue"><div class="stat-label">Total Runs</div><div class="stat-value">${hist.length}</div></div>
+          <div class="stat-card green"><div class="stat-label">Avg Time</div><div class="stat-value" style="font-size:20px">${avg!=null?avg+'ms':'—'}</div></div>
+          <div class="stat-card warn"><div class="stat-label">Threshold</div><div class="stat-value" style="font-size:20px">${ep.threshold_ms}ms</div></div>
+        </div>
+        <canvas id="ep-mini-canvas" height="140"></canvas>
+      </div>
+    </div>
+  `;
+
+  $('ep-stat-run').addEventListener('click', ()=>{
+    $('tf-url').value=$('tf-url').value||ep.url;
+    $('tf-name').value=ep.name; $('tf-url').value=ep.url;
+    $('tf-method').value=ep.method;
+    $('tf-headers').value=JSON.stringify(ep.headers||{},null,2);
+    $('tf-body').value=ep.body||'';
+    $('tf-threshold').value=ep.threshold_ms||1000;
+    switchPage('tester'); runTest();
+  });
+  $('ep-stat-edit').addEventListener('click', ()=>openModal(ep));
+
+  // Mini chart
+  if(hist.length){
+    const reversed = [...hist].reverse();
+    new Chart($('ep-mini-canvas'), {
+      type:'line',
+      data:{
+        labels: reversed.map(r=>fmtTimeShort(r.created_at)),
+        datasets:[
+          { data:reversed.map(r=>r.response_time), borderColor:'#00d4aa', backgroundColor:'rgba(0,212,170,.06)', tension:.35, fill:true, pointRadius:3, pointBackgroundColor:reversed.map(r=>r.is_slow?'#ffb347':'#00d4aa') },
+          { data:reversed.map(()=>ep.threshold_ms), borderColor:'rgba(255,179,71,.4)', borderDash:[4,4], pointRadius:0, fill:false },
+        ],
+      },
+      options:{ plugins:{legend:{display:false}}, scales:{ x:{display:false}, y:{grid:{color:'#252b35'},ticks:{color:'#5a6475',font:{family:'JetBrains Mono',size:9}}} }, animation:{duration:400}, maintainAspectRatio:false },
+    });
+  }
+}
+
+async function deleteEndpoint(id){
+  if(!confirm('Delete this endpoint and all its history?')) return;
+  await api('DELETE','/endpoints/'+id);
+  toast('Endpoint deleted');
+  if(selectedEpId===id){ selectedEpId=null; $('ep-stats-panel').innerHTML='<div class="card"><div class="empty"><div class="empty-icon">👈</div>Select an endpoint</div></div>'; }
+  loadEndpoints();
+}
+
+// ── Modal ───────────────────────────────────────────────
+function openModal(data=null){
+  $('modal-ep-id').value     = data?.id||'';
+  $('modal-title').textContent = data?.id ? 'Edit Endpoint' : 'New Endpoint';
+  $('modal-name').value      = data?.name||'';
+  $('modal-url').value       = data?.url||'';
+  $('modal-method').value    = data?.method||'GET';
+  $('modal-headers').value   = data?.headers ? (typeof data.headers==='object'?JSON.stringify(data.headers,null,2):data.headers) : '{}';
+  $('modal-body').value      = data?.body||'';
+  $('modal-threshold').value = data?.threshold_ms||1000;
+  $('modal-tags').value      = data?.tags||'';
+  $('ep-modal').style.display='flex';
+}
+function closeModal(){ $('ep-modal').style.display='none'; }
+
+$('modal-close').addEventListener('click', closeModal);
+$('modal-cancel').addEventListener('click', closeModal);
+$('ep-modal').addEventListener('click', e=>{ if(e.target===$('ep-modal')) closeModal(); });
+
+$('modal-save').addEventListener('click', async ()=>{
+  const name = $('modal-name').value.trim();
+  const url  = $('modal-url').value.trim();
+  if(!name||!url){ toast('Name and URL are required','error'); return; }
+  let headers={};
+  try { headers=JSON.parse($('modal-headers').value||'{}'); } catch{ toast('Invalid headers JSON','error'); return; }
+  const data = { name, url, method:$('modal-method').value, headers, body:$('modal-body').value, threshold_ms:+$('modal-threshold').value||1000, tags:$('modal-tags').value };
+  const id = $('modal-ep-id').value;
+  if(id){ await api('PUT','/endpoints/'+id, data); toast('Endpoint updated'); }
+  else  { await api('POST','/endpoints', data);    toast('Endpoint saved'); }
+  closeModal();
+  loadEndpoints();
+  loadQuickList();
+});
+
+// ── Dashboard ───────────────────────────────────────────
+async function loadDashboard(){
+  try {
+    const [d, alerts, hist] = await Promise.all([
+      api('GET','/dashboard/overview'),
+      api('GET','/dashboard/alerts'),
+      api('GET','/tests/history?limit=50'),
+    ]);
+
+    $('dash-stats').innerHTML = `
+      <div class="stat-card blue"><div class="stat-label">Total Endpoints</div><div class="stat-value">${d.total_endpoints}</div></div>
+      <div class="stat-card green"><div class="stat-label">Tests Today</div><div class="stat-value">${d.tests_today}</div><div class="stat-sub">of ${d.total_tests} total</div></div>
+      <div class="stat-card green"><div class="stat-label">Avg Response</div><div class="stat-value" style="font-size:22px">${d.avg_response_ms!=null?d.avg_response_ms+'ms':'—'}</div></div>
+      <div class="stat-card warn"><div class="stat-label">Slow Today</div><div class="stat-value">${d.slow_today}</div></div>
+      <div class="stat-card red"><div class="stat-label">Errors Today</div><div class="stat-value">${d.errors_today}</div></div>
+    `;
+
+    // Alerts
+    const unread = alerts.filter(a=>!a.acknowledged);
+    $('alerts-list').innerHTML = unread.length ? unread.slice(0,10).map(a=>`
+      <div class="alert-item alert-${a.type}">
+        <div class="alert-icon">${a.type==='slow'?'⚠️':'⛔'}</div>
+        <div class="alert-body">
+          <div class="alert-title">${esc(a.endpoint_name||'Ad-hoc')} · <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${a.type}</span></div>
+          <div class="alert-msg">${esc(a.message)}</div>
+        </div>
+        <button class="btn btn-ghost" style="font-size:10px;padding:2px 8px;flex-shrink:0" data-ack="${a.id}">Ack</button>
+      </div>
+    `).join('') : '<div class="empty"><div class="empty-icon">✅</div>No unacknowledged alerts</div>';
+
+    $('alerts-list').querySelectorAll('[data-ack]').forEach(el=>{
+      el.addEventListener('click', async ()=>{ await api('PATCH','/dashboard/alerts/'+el.dataset.ack+'/ack'); loadDashboard(); });
+    });
+
+    // Slowest
+    $('slowest-tbody').innerHTML = d.slowest_endpoints?.length ? d.slowest_endpoints.map(e=>`
+      <tr>
+        <td><div style="font-size:12px;font-weight:700">${esc(e.name||'—')}</div></td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--warn)">${fmtMs(Math.round(e.avg_ms))}</td>
+        <td style="font-family:var(--mono);font-size:12px">${e.test_count}</td>
+        <td style="font-family:var(--mono);font-size:12px">${e.test_count>0?Math.round(e.slow_count/e.test_count*100)+'%':'—'}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="4"><div class="empty" style="padding:24px">No data yet</div></td></tr>';
+
+    // Trend chart
+    if(dashChart) dashChart.destroy();
+    const rows = [...hist].filter(r=>r.response_time!=null).reverse();
+    dashChart = new Chart($('dash-chart'), {
+      type:'line',
+      data:{
+        labels: rows.map(r=>fmtTimeShort(r.created_at)),
+        datasets:[{ data:rows.map(r=>r.response_time), borderColor:'#0097ff', backgroundColor:'rgba(0,151,255,.08)', tension:.3, fill:true, pointRadius:2, pointBackgroundColor:rows.map(r=>r.is_slow?'#ffb347':r.error?'#ff4d6d':'#0097ff') }],
+      },
+      options:{ plugins:{legend:{display:false}}, scales:{ x:{display:false}, y:{grid:{color:'#252b35'},ticks:{color:'#5a6475',font:{family:'JetBrains Mono',size:9}}} }, animation:{duration:400}, maintainAspectRatio:false },
+    });
+  } catch{}
+}
+
+$('btn-ack-all').addEventListener('click', async ()=>{ await api('PATCH','/dashboard/alerts/ack-all'); loadDashboard(); });
+
+// ── Compare ─────────────────────────────────────────────
+function renderCompareCheckboxes(){
+  const box = $('compare-checkboxes');
+  if(!endpoints.length){ box.innerHTML='<span style="font-family:var(--mono);font-size:11px;color:var(--text3)">No endpoints saved yet</span>'; return; }
+  box.innerHTML = endpoints.map(ep=>`
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--text2);text-transform:none;letter-spacing:0">
+      <input type="checkbox" value="${ep.id}" style="width:auto;accent-color:var(--accent)"/>
+      <span class="method method-${ep.method}">${ep.method}</span>
+      ${esc(ep.name)}
+    </label>
+  `).join('');
+}
+
+$('btn-compare').addEventListener('click', async ()=>{
+  const ids = [...document.querySelectorAll('#compare-checkboxes input:checked')].map(el=>el.value);
+  if(ids.length<2){ toast('Select at least 2 endpoints','error'); return; }
+  const period = $('compare-period').value;
+  const q = ids.map(id=>`ids[]=${id}`).join('&')+'&period='+period;
+  const rows = await api('GET','/dashboard/compare?'+q).catch(()=>[]);
+  if(!rows.length){ $('compare-results').innerHTML='<div class="card"><div class="empty"><div class="empty-icon">📭</div>No data for selected period</div></div>'; return; }
+
+  const maxAvg = Math.max(...rows.map(r=>r.avg_ms||0));
+  $('compare-results').innerHTML = `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><span class="card-title">Results</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Endpoint</th><th>Avg</th><th>Min</th><th>Max</th><th>Runs</th><th>Slow%</th><th>Error%</th><th>Bar</th></tr></thead>
+          <tbody>
+            ${[...rows].sort((a,b)=>a.avg_ms-b.avg_ms).map(r=>`
+              <tr>
+                <td style="font-weight:700;font-size:12px">${esc(r.name||r.endpoint_id)}</td>
+                <td style="font-family:var(--mono);font-weight:700;color:var(--accent)">${fmtMs(Math.round(r.avg_ms))}</td>
+                <td style="font-family:var(--mono);font-size:11px;color:var(--success)">${fmtMs(r.min_ms)}</td>
+                <td style="font-family:var(--mono);font-size:11px;color:var(--warn)">${fmtMs(r.max_ms)}</td>
+                <td style="font-family:var(--mono);font-size:11px">${r.count}</td>
+                <td style="font-family:var(--mono);font-size:11px">${r.count>0?Math.round(r.slow_count/r.count*100)+'%':'—'}</td>
+                <td style="font-family:var(--mono);font-size:11px">${r.count>0?Math.round(r.error_count/r.count*100)+'%':'—'}</td>
+                <td style="min-width:100px"><div style="height:8px;border-radius:4px;background:var(--border);overflow:hidden"><div style="height:100%;border-radius:4px;width:${maxAvg>0?Math.round((r.avg_ms||0)/maxAvg*100):0}%;background:${(r.avg_ms||0)>1000?'var(--warn)':'var(--accent)'}"></div></div></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Avg Response Time Comparison</span></div>
+      <div class="card-body"><div class="chart-box" style="height:240px"><canvas id="compare-canvas"></canvas></div></div>
+    </div>
+  `;
+
+  if(compareChart) compareChart.destroy();
+  const sorted = [...rows].sort((a,b)=>a.avg_ms-b.avg_ms);
+  compareChart = new Chart($('compare-canvas'), {
+    type:'bar',
+    data:{
+      labels: sorted.map(r=>r.name||r.endpoint_id),
+      datasets:[
+        { label:'Avg (ms)', data:sorted.map(r=>Math.round(r.avg_ms||0)), backgroundColor:'rgba(0,212,170,.6)', borderColor:'#00d4aa', borderWidth:1 },
+        { label:'Max (ms)', data:sorted.map(r=>r.max_ms||0), backgroundColor:'rgba(255,179,71,.4)', borderColor:'#ffb347', borderWidth:1 },
+      ],
+    },
+    options:{ plugins:{legend:{display:true,labels:{color:'#8c97a8',font:{family:'JetBrains Mono',size:10}}}}, scales:{ x:{grid:{color:'#252b35'},ticks:{color:'#5a6475'}}, y:{grid:{color:'#252b35'},ticks:{color:'#5a6475'}} }, animation:{duration:400}, maintainAspectRatio:false },
+  });
+});
+
+// ── Boot ────────────────────────────────────────────────
+(async ()=>{
+  await loadQuickList();
+})();
+</script>
+</body>
+</html>
